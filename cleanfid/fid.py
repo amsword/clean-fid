@@ -129,21 +129,24 @@ def get_folder_features(fdir, model=None, num_workers=12, num=None,
                         mode="clean", custom_fn_resize=None, description="", verbose=True,
                         custom_image_tranform=None):
     # get all relevant files in the dataset
-    if ".zip" in fdir:
-        files = list(set(zipfile.ZipFile(fdir).namelist()))
-        # remove the non-image files inside the zip
-        files = [x for x in files if os.path.splitext(x)[1].lower()[1:] in EXTENSIONS]
+    if isinstance(fdir, str):
+        if ".zip" in fdir:
+            files = list(set(zipfile.ZipFile(fdir).namelist()))
+            # remove the non-image files inside the zip
+            files = [x for x in files if os.path.splitext(x)[1].lower()[1:] in EXTENSIONS]
+        else:
+            files = sorted([file for ext in EXTENSIONS
+                        for file in glob(os.path.join(fdir, f"**/*.{ext}"), recursive=True)])
+        if verbose:
+            print(f"Found {len(files)} images in the folder {fdir}")
+        # use a subset number of files if needed
+        if num is not None:
+            if shuffle:
+                random.seed(seed)
+                random.shuffle(files)
+            files = files[:num]
     else:
-        files = sorted([file for ext in EXTENSIONS
-                    for file in glob(os.path.join(fdir, f"**/*.{ext}"), recursive=True)])
-    if verbose:
-        print(f"Found {len(files)} images in the folder {fdir}")
-    # use a subset number of files if needed
-    if num is not None:
-        if shuffle:
-            random.seed(seed)
-            random.shuffle(files)
-        files = files[:num]
+        files = fdir
     np_feats = get_files_features(files, model, num_workers=num_workers,
                                   batch_size=batch_size, device=device, mode=mode,
                                   custom_fn_resize=custom_fn_resize,
@@ -265,7 +268,10 @@ def compare_folders(fdir1, fdir2, feat_model, mode, num_workers=0,
                     batch_size=8, device=torch.device("cuda"), verbose=True,
                     custom_image_tranform=None, custom_fn_resize=None):
     # get all inception features for the first folder
-    fbname1 = os.path.basename(fdir1)
+    if isinstance(fdir1, str):
+        fbname1 = os.path.basename(fdir1)
+    else:
+        fbname1 = str(fdir1)
     np_feats1 = get_folder_features(fdir1, feat_model, num_workers=num_workers,
                                     batch_size=batch_size, device=device, mode=mode,
                                     description=f"FID {fbname1} : ", verbose=verbose,
@@ -274,7 +280,10 @@ def compare_folders(fdir1, fdir2, feat_model, mode, num_workers=0,
     mu1 = np.mean(np_feats1, axis=0)
     sigma1 = np.cov(np_feats1, rowvar=False)
     # get all inception features for the second folder
-    fbname2 = os.path.basename(fdir2)
+    if isinstance(fdir1, str):
+        fbname2 = os.path.basename(fdir2)
+    else:
+        fbname2 = str(fdir2)
     np_feats2 = get_folder_features(fdir2, feat_model, num_workers=num_workers,
                                     batch_size=batch_size, device=device, mode=mode,
                                     description=f"FID {fbname2} : ", verbose=verbose,

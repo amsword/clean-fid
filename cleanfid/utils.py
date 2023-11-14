@@ -5,6 +5,14 @@ from PIL import Image
 from cleanfid.resize import build_resizer
 import zipfile
 
+def pilimg_from_base64(imagestring, format='RGB'):
+    import io
+    import base64
+    jpgbytestring = base64.b64decode(imagestring)
+    image = Image.open(io.BytesIO(jpgbytestring))
+    if format:
+        image = image.convert(format)
+    return image
 
 class ResizeDataset(torch.utils.data.Dataset):
     """
@@ -34,14 +42,18 @@ class ResizeDataset(torch.utils.data.Dataset):
         return len(self.files)
 
     def __getitem__(self, i):
-        path = str(self.files[i])
-        if self.fdir is not None and '.zip' in self.fdir:
-            with self._get_zipfile().open(path, 'r') as f:
-                img_np = np.array(Image.open(f).convert('RGB'))
-        elif ".npy" in path:
-            img_np = np.load(path)
+        if isinstance(self.files, str):
+            path = str(self.files[i])
+            if self.fdir is not None and '.zip' in self.fdir:
+                with self._get_zipfile().open(path, 'r') as f:
+                    img_np = np.array(Image.open(f).convert('RGB'))
+            elif ".npy" in path:
+                img_np = np.load(path)
+            else:
+                img_pil = Image.open(path).convert('RGB')
+                img_np = np.array(img_pil)
         else:
-            img_pil = Image.open(path).convert('RGB')
+            img_pil = pilimg_from_base64(self.files[i][-1])
             img_np = np.array(img_pil)
 
         # apply a custom image transform before resizing the image to 299x299
